@@ -24,10 +24,10 @@
         <div class="hero-badge">✨ WORD GAME</div>
         <h1 class="title">단어 복습 게임</h1>
         <p class="subtitle">누구의 단어를 복습할까요?</p>
+        <button class="btn-help" id="btn-open-help">❓ 사용법 보기</button>
       </div>
       <div class="student-cards" id="student-cards"></div>
       <p class="select-hint">✏️ 버튼으로 이름과 캐릭터를 바꿀 수 있어요</p>
-      <button class="btn-help" id="btn-open-help">❓ 사용법 보기</button>
     </section>
 
     <!-- 사용법 안내 모달 -->
@@ -51,16 +51,30 @@
               <b>단어 넣기</b>
               <p>학생 선택 → <span class="help-chip">⚙️ 단어 목록 관리</span> →
                  <span class="help-chip">📋 붙여넣기 가져오기</span></p>
+
+              <p class="help-method">✍️ 방법 1 · 단어를 직접 입력할 때</p>
               <div class="help-flow">
-                <span>복습할 단어를 입력하고 <b>AI 프롬프트 복사</b> 버튼 클릭</span>
+                <span>STEP 1 칸에 복습할 단어를 입력하고 <b>AI 프롬프트 복사</b> 클릭</span>
                 <span class="help-arrow">↓</span>
-                <span>GPT나 제미나이에 붙여넣기
-                  <small>(교재 사진·PDF로 물어볼 땐 단어 칸을 비워두고 복사한 뒤, 파일과 함께 붙여넣으세요)</small></span>
+                <span>GPT나 제미나이 채팅창에 붙여넣기 → 표로 정리된 답변이 나와요</span>
                 <span class="help-arrow">↓</span>
-                <span>AI가 만들어준 표를 통째로 복사해서 STEP 2 칸에 붙여넣기</span>
+                <span>답변 표를 통째로 복사해서 게임의 STEP 2 칸에 붙여넣기</span>
                 <span class="help-arrow">↓</span>
                 <span><b>미리보기</b> → <b>추가하기</b> 완료! 🎉</span>
               </div>
+
+              <p class="help-method">📷 방법 2 · 교재 사진이나 PDF 파일로 넣을 때</p>
+              <div class="help-flow">
+                <span>STEP 1 단어 칸을 <b>비워둔 채</b> <b>AI 프롬프트 복사</b> 클릭
+                  <small>"파일 첨부용 프롬프트"가 자동으로 복사돼요</small></span>
+                <span class="help-arrow">↓</span>
+                <span>GPT나 제미나이 채팅창에서 📎(첨부) 버튼으로 <b>사진·PDF 올리기</b> + 복사한 프롬프트 붙여넣기</span>
+                <span class="help-arrow">↓</span>
+                <span>AI가 파일 속 단어를 찾아 표로 정리해줘요 → 표를 통째로 복사</span>
+                <span class="help-arrow">↓</span>
+                <span>게임의 STEP 2 칸에 붙여넣기 → <b>미리보기</b> → <b>추가하기</b> 🎉</span>
+              </div>
+
               <p class="help-sub">구글시트에서 복사한 표도 그대로 붙여넣을 수 있고,
                  ＋ 추가 버튼으로 한 단어씩 직접 넣을 수도 있어요.</p>
             </div>
