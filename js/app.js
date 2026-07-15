@@ -962,6 +962,16 @@ document.getElementById("student-overlay").addEventListener("click", (e) => {
   if (e.target === document.getElementById("student-overlay")) closeStudentModal();
 });
 document.getElementById("s-name").addEventListener("keydown", (e) => { if (e.key === "Enter") saveStudentForm(); });
+
+// 사용법 안내 모달
+function openHelp()  { document.getElementById("help-overlay").classList.remove("hidden"); }
+function closeHelp() { document.getElementById("help-overlay").classList.add("hidden"); }
+document.getElementById("btn-open-help").addEventListener("click", openHelp);
+document.getElementById("btn-warning-help").addEventListener("click", openHelp);
+document.getElementById("btn-help-close").addEventListener("click", closeHelp);
+document.getElementById("help-overlay").addEventListener("click", (e) => {
+  if (e.target === document.getElementById("help-overlay")) closeHelp();
+});
 document.querySelectorAll(".mode-btn").forEach((btn) => {
   btn.addEventListener("click", () => startRound(btn.dataset.mode));
 });

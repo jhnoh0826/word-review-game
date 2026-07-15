@@ -123,6 +123,81 @@ body {
   color: rgba(255,255,255,0.35);
 }
 
+.btn-help {
+  display: block; margin: 14px auto 0;
+  background: rgba(255,255,255,0.06);
+  border: 1.5px dashed rgba(255,255,255,0.25);
+  color: rgba(255,255,255,0.55); font-family: inherit;
+  font-size: 14px; font-weight: 700;
+  padding: 10px 22px; border-radius: 12px; cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.btn-help:hover {
+  background: rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.85);
+  border-color: rgba(255,255,255,0.45);
+}
+
+/* 사용법 안내 모달 */
+.help-card { max-width: 560px; }
+.help-steps { display: flex; flex-direction: column; gap: 18px; }
+.help-step { display: flex; gap: 14px; }
+.help-step-num {
+  flex-shrink: 0;
+  width: 34px; height: 34px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), #a78bfa);
+  color: #fff; font-size: 17px; font-weight: 900;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 12px var(--primary-glow);
+}
+.help-step-body { flex: 1; min-width: 0; }
+.help-step-body b { display: block; font-size: 17px; color: #fff; margin-bottom: 6px; }
+.help-step-body p {
+  font-size: 14px; font-weight: 600; line-height: 1.65;
+  color: rgba(255,255,255,0.65);
+}
+.help-chip {
+  display: inline-block;
+  background: rgba(108,99,255,0.2); border: 1px solid rgba(108,99,255,0.45);
+  color: #a89fff; border-radius: 8px;
+  padding: 1px 8px; font-size: 13px; font-weight: 700;
+  white-space: nowrap;
+}
+.help-flow {
+  display: flex; flex-direction: column; gap: 4px;
+  background: rgba(0,0,0,0.25); border-radius: 12px;
+  padding: 12px 14px; margin: 10px 0;
+}
+.help-flow span {
+  font-size: 13.5px; font-weight: 600; line-height: 1.55;
+  color: rgba(255,255,255,0.75);
+}
+.help-flow span b { display: inline; font-size: inherit; color: #ffd460; margin: 0; }
+.help-flow small {
+  display: block; font-size: 12px; color: rgba(255,255,255,0.4); font-weight: 600;
+}
+.help-arrow {
+  color: var(--primary) !important; font-weight: 900 !important;
+  text-align: center; line-height: 1 !important;
+}
+.help-sub { font-size: 12.5px !important; color: rgba(255,255,255,0.42) !important; }
+.help-note {
+  background: rgba(255,212,96,0.1); border: 1px solid rgba(255,212,96,0.3);
+  color: #ffd460; border-radius: 12px;
+  padding: 12px 14px; margin-top: 18px;
+  font-size: 13px; font-weight: 600; line-height: 1.6;
+}
+
+.btn-warning-help {
+  display: block; margin-top: 12px;
+  background: rgba(255,212,96,0.15); border: 1.5px solid rgba(255,212,96,0.5);
+  color: #ffd460; font-family: inherit;
+  font-size: 14px; font-weight: 800;
+  padding: 10px 16px; border-radius: 10px; cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-warning-help:hover { background: rgba(255,212,96,0.28); }
+
 /* 학생 프로필 모달: 이모지·색상 선택 */
 .emoji-grid {
   display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px;
