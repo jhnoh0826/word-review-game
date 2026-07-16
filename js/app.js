@@ -214,12 +214,25 @@ function pickDistractors(correctWord, candidates, n) {
   const topSlice = ranked.slice(0, Math.max(n * 2, 6)).map((r) => r.w);
   return sample(topSlice, n);
 }
+// text 안에 이미 등장한 단어는 오답 후보에서 제외 (문제 지문에 정답 힌트가 그대로 노출되는 것 방지)
+function excludeTextLeak(candidates, text) {
+  if (!text) return candidates;
+  return candidates.filter((w) => {
+    const escaped = w.word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return !new RegExp(`\\b${escaped}\\b`, "i").test(text);
+  });
+}
+// "거의 동의어" 수준으로 비슷하면 문장 빈칸 채우기에서 정답이 여러 개처럼 보일 수 있어 이 임계값 이상은 제외
+const NEAR_SYNONYM_THRESHOLD = 0.6;
 
 // 객관식 보기 4개 만들기 (정답 + 오답 3개)
-function buildChoices(correctWord, field) {
+// leakText가 주어지면 그 문장에 이미 등장한 단어는 오답에서 제외한다 (예: 영영 풀이 지문)
+function buildChoices(correctWord, field, leakText) {
   // 값이 정답과 우연히 같은 단어(예: 같은 한글 뜻)는 후보에서 제외
-  const candidates = state.words.filter((w) => w.word !== correctWord.word && w[field] !== correctWord[field]);
-  const n = Math.min(3, candidates.length);
+  const base = state.words.filter((w) => w.word !== correctWord.word && w[field] !== correctWord[field]);
+  let candidates = excludeTextLeak(base, leakText);
+  const n = Math.min(3, base.length);
+  if (candidates.length < n) candidates = base; // 유출 단어를 뺐더니 후보가 모자라면 완화
   const distractors = pickDistractors(correctWord, candidates, n).map((w) => w[field]);
   return shuffle([correctWord[field], ...distractors]);
 }
@@ -243,7 +256,7 @@ function makeMeaningEn(word) {
     word: word.word,
     label: "설명에 맞는 단어는?",
     prompt: `"${word.meaning_en}"`,
-    choices: buildChoices(word, "word"),
+    choices: buildChoices(word, "word", word.meaning_en),
     answer: word.word,
     kind: "choice",
   };
@@ -276,8 +289,13 @@ function makeSpellTiles(word) {
 function makeSentence(word) {
   // 예문에 실제 쓰인 형태 추출 (captivate → captivated, crouch → crouched 등)
   const actualForm = findInflectedForm(word.example, word.word);
-  const candidates = state.words.filter((w) => w.word !== word.word);
-  const distractors = pickDistractors(word, candidates, Math.min(3, candidates.length)).map((w) => w.word);
+  // 예문에 이미 등장하는 단어(정답 유출)는 제외하고, 거의 동의어인 단어도 제외
+  // (뜻이 너무 가까우면 그 단어를 넣어도 문장이 말이 되어 정답이 여러 개처럼 보일 수 있음)
+  const base = excludeTextLeak(state.words.filter((w) => w.word !== word.word), word.example);
+  let candidates = base.filter((w) => wordSimilarity(word, w) < NEAR_SYNONYM_THRESHOLD);
+  const n = Math.min(3, base.length);
+  if (candidates.length < n) candidates = base; // 동의어를 뺐더니 후보가 모자라면 완화
+  const distractors = pickDistractors(word, candidates, n).map((w) => w.word);
   return {
     type: "sentence",
     word: word.word,
