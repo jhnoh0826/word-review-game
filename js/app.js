@@ -162,10 +162,65 @@ function blankOut(example, word) {
  *  각 유형은 { type, word, render, check } 를 반환
  * ========================================================================= */
 
+// ---- 헷갈리는 오답(distractor) 고르기 ----
+// 단순 무작위 오답은 소거법으로 쉽게 풀리므로, 뜻이나 철자가 비슷한 단어를 우선 뽑아 난이도를 높인다.
+const DEFINITION_STOPWORDS = new Set([
+  "a","an","the","to","of","in","on","for","with","by","or","and","is","are","was","were",
+  "be","being","been","that","this","these","those","from","at","as","it","its","if","so",
+  "not","no","than","then","there","which","who","whom","whose","what","when","where","how",
+  "something","someone","somebody","anything","anyone","one","especially","usually","often",
+  "also","very","more","most","such","used","use","having","having","having","do","does","did",
+  "can","could","will","would","should","may","might","must","into","onto","out","up","down",
+  "over","under","about","after","before","between","without","within","especially","typically",
+]);
+function tokenizeDefinition(text) {
+  return (text || "").toLowerCase().match(/[a-z']+/g)
+    ?.filter((w) => w.length > 2 && !DEFINITION_STOPWORDS.has(w)) || [];
+}
+// 자카드 유사도: 두 정의 문장이 공통으로 쓰는 핵심 단어 비율
+function definitionSimilarity(a, b) {
+  const setA = new Set(tokenizeDefinition(a));
+  const setB = new Set(tokenizeDefinition(b));
+  if (!setA.size || !setB.size) return 0;
+  let overlap = 0;
+  setA.forEach((w) => { if (setB.has(w)) overlap++; });
+  return overlap / Math.sqrt(setA.size * setB.size);
+}
+// 편집 거리 기반 철자 유사도 (0~1)
+function spellingSimilarity(a, b) {
+  const s1 = a.toLowerCase(), s2 = b.toLowerCase();
+  const dp = Array.from({ length: s1.length + 1 }, (_, i) => [i, ...Array(s2.length).fill(0)]);
+  for (let j = 0; j <= s2.length; j++) dp[0][j] = j;
+  for (let i = 1; i <= s1.length; i++) {
+    for (let j = 1; j <= s2.length; j++) {
+      dp[i][j] = s1[i - 1] === s2[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j - 1], dp[i - 1][j], dp[i][j - 1]);
+    }
+  }
+  const dist = dp[s1.length][s2.length];
+  return 1 - dist / Math.max(s1.length, s2.length, 1);
+}
+// 두 단어의 전체 유사도 = 뜻(의미) 유사도 위주 + 철자 유사도 보정
+function wordSimilarity(a, b) {
+  return definitionSimilarity(a.meaning_en, b.meaning_en) * 1.5 + spellingSimilarity(a.word, b.word) * 0.5;
+}
+// candidates 중 correctWord와 가장 헷갈릴 만한(비슷한) 단어들 사이에서 n개를 무작위로 뽑는다
+function pickDistractors(correctWord, candidates, n) {
+  if (candidates.length <= n) return shuffle(candidates);
+  const ranked = candidates
+    .map((w) => ({ w, score: wordSimilarity(correctWord, w) }))
+    .sort((a, b) => b.score - a.score);
+  const topSlice = ranked.slice(0, Math.max(n * 2, 6)).map((r) => r.w);
+  return sample(topSlice, n);
+}
+
 // 객관식 보기 4개 만들기 (정답 + 오답 3개)
 function buildChoices(correctWord, field) {
-  const pool = state.words.filter((w) => w.word !== correctWord.word);
-  const distractors = sample(pool, Math.min(3, pool.length)).map((w) => w[field]);
+  // 값이 정답과 우연히 같은 단어(예: 같은 한글 뜻)는 후보에서 제외
+  const candidates = state.words.filter((w) => w.word !== correctWord.word && w[field] !== correctWord[field]);
+  const n = Math.min(3, candidates.length);
+  const distractors = pickDistractors(correctWord, candidates, n).map((w) => w[field]);
   return shuffle([correctWord[field], ...distractors]);
 }
 
@@ -221,10 +276,8 @@ function makeSpellTiles(word) {
 function makeSentence(word) {
   // 예문에 실제 쓰인 형태 추출 (captivate → captivated, crouch → crouched 등)
   const actualForm = findInflectedForm(word.example, word.word);
-  const distractors = sample(
-    state.words.filter((w) => w.word !== word.word),
-    Math.min(3, state.words.length - 1)
-  ).map((w) => w.word);
+  const candidates = state.words.filter((w) => w.word !== word.word);
+  const distractors = pickDistractors(word, candidates, Math.min(3, candidates.length)).map((w) => w.word);
   return {
     type: "sentence",
     word: word.word,
