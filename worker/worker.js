@@ -38,16 +38,38 @@ function buildPrompt(words, hasFile) {
 ${hasFile && words ? "파일에서 찾은 단어와 아래 단어 목록을 합쳐서 정리해줘.\n" : ""}${source}`;
 }
 
+// 환경변수 이름에 실수로 공백이 섞여 들어가도 찾을 수 있게 이름을 다듬어서 조회
+function getEnv(env, name) {
+  if (env[name] !== undefined) return env[name];
+  const key = Object.keys(env).find((k) => k.trim() === name);
+  return key ? env[key] : undefined;
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: CORS_HEADERS });
     }
+
+    const GEMINI_API_KEY = getEnv(env, "GEMINI_API_KEY");
+
+    // 진단용: 사용 가능한 모델 목록 (모델 이름만 반환, 비밀정보 없음)
+    if (request.method === "GET" && new URL(request.url).pathname === "/models") {
+      const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models", {
+        headers: { "x-goog-api-key": GEMINI_API_KEY || "" },
+      });
+      const d = await r.json().catch(() => ({}));
+      const names = (d.models || []).map((m) => m.name);
+      return json({ status: r.status, models: names });
+    }
+
     if (request.method !== "POST") {
       return json({ error: "POST 요청만 받아요" }, 405);
     }
+    const BETA_CODE = getEnv(env, "BETA_CODE");
+    const MODEL = getEnv(env, "MODEL");
 
-    if (!env.GEMINI_API_KEY) {
+    if (!GEMINI_API_KEY) {
       return json({ error: "서버에 API 키가 아직 설정되지 않았어요. (Cloudflare 대시보드에서 GEMINI_API_KEY를 등록하세요)" }, 500);
     }
 
@@ -59,7 +81,7 @@ export default {
     }
 
     // 베타 코드 확인 (BETA_CODE가 설정된 경우에만)
-    if (env.BETA_CODE && body.betaCode !== env.BETA_CODE) {
+    if (BETA_CODE && body.betaCode !== BETA_CODE) {
       return json({ error: "베타 코드가 올바르지 않아요" }, 403);
     }
 
@@ -87,7 +109,8 @@ export default {
     if (file) parts.push({ inline_data: { mime_type: file.mimeType, data: file.data } });
     parts.push({ text: buildPrompt(words, !!file) });
 
-    const model = env.MODEL || "gemini-2.5-flash";
+    // gemini-flash-latest: 구글이 최신 flash 모델로 자동 연결해주는 별칭 (모델 세대가 바뀌어도 계속 동작)
+    const model = MODEL || "gemini-flash-latest";
     let res;
     try {
       res = await fetch(
@@ -96,7 +119,7 @@ export default {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-goog-api-key": env.GEMINI_API_KEY,
+            "x-goog-api-key": GEMINI_API_KEY,
           },
           body: JSON.stringify({ contents: [{ parts }] }),
         }
@@ -107,9 +130,10 @@ export default {
 
     if (!res.ok) {
       const status = res.status;
+      const detail = (await res.text().catch(() => "")).slice(0, 500);
       if (status === 429) return json({ error: "오늘 사용량 한도를 넘었어요. 내일 다시 시도해 주세요" }, 429);
-      if (status === 400 || status === 403) return json({ error: "API 키가 잘못됐거나 권한이 없어요 (관리자 확인 필요)" }, 502);
-      return json({ error: `AI 서버 오류 (${status}). 잠시 후 다시 시도해 주세요` }, 502);
+      if (status === 403) return json({ error: "API 키가 잘못됐거나 권한이 없어요 (관리자 확인 필요)" }, 502);
+      return json({ error: `AI 서버 오류 (${status}). 잠시 후 다시 시도해 주세요`, detail }, 502);
     }
 
     const data = await res.json();
