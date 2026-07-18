@@ -741,6 +741,43 @@ body {
   font-weight: 600; margin-top: 10px; line-height: 1.5;
 }
 
+/* AI 직접 생성 (베타) */
+.ai-direct { display: flex; flex-direction: column; gap: 10px; }
+.ai-direct-row { display: flex; align-items: center; gap: 10px; }
+.btn-ai-file {
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.08);
+  border: 1.5px solid rgba(255,255,255,0.22);
+  color: rgba(255,255,255,0.75); font-family: inherit;
+  font-size: 13.5px; font-weight: 700;
+  padding: 10px 14px; border-radius: 10px; cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-ai-file:hover { background: rgba(255,255,255,0.16); }
+.ai-file-name {
+  font-size: 12.5px; font-weight: 600;
+  color: rgba(255,255,255,0.4);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  min-width: 0;
+}
+.btn-ai-generate {
+  width: 100%;
+  background: linear-gradient(135deg, var(--primary), #a78bfa);
+  color: #fff; border: none; font-family: inherit;
+  font-size: 15px; font-weight: 800;
+  padding: 13px; border-radius: 14px; cursor: pointer;
+  box-shadow: 0 6px 18px var(--primary-glow);
+  transition: transform 0.12s, box-shadow 0.15s, opacity 0.15s;
+}
+.btn-ai-generate:hover:not(:disabled) { transform: translateY(-2px); }
+.btn-ai-generate:disabled { opacity: 0.6; cursor: wait; }
+.beta-input {
+  font-size: 13px !important; padding: 9px 12px !important;
+}
+.manual-detail { margin-top: 12px; }
+.manual-detail summary { font-size: 12.5px; }
+.manual-detail .btn-copy-prompt { margin-top: 10px; }
+
 .import-guide { margin-bottom: 14px; }
 .guide-text { font-size: 15px; color: rgba(255,255,255,0.65); font-weight: 600; margin-bottom: 8px; }
 .guide-detail summary {

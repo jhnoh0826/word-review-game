@@ -809,6 +809,8 @@ let _parsedImport = []; // 파싱된 결과를 임시 저장
 
 function openImport() {
   _parsedImport = [];
+  setAiFile(null);
+  document.getElementById("ai-file-input").value = "";
   document.getElementById("import-textarea").value = "";
   document.getElementById("prompt-word-input").value = "";
   document.getElementById("import-preview").classList.add("hidden");
@@ -864,6 +866,92 @@ async function copyAiPrompt() {
 
 function closeImport() {
   document.getElementById("import-overlay").classList.add("hidden");
+}
+
+/* =========================================================================
+ *  AI 직접 생성 (베타) - 중계 서버를 통해 제미나이로 단어장 생성
+ * ========================================================================= */
+
+const AI_WORKER_URL = "https://word-review-ai.jh-noh0826.workers.dev";
+
+let _aiFile = null; // 선택된 파일 (File 객체)
+
+function setAiFile(file) {
+  _aiFile = file;
+  document.getElementById("ai-file-name").textContent = file ? file.name : "선택된 파일 없음";
+}
+
+// 이미지: 캔버스로 축소(최대 1600px, JPEG)해서 용량·토큰 절약. PDF: 그대로 base64.
+async function prepareAiFile(file) {
+  if (file.type === "application/pdf") {
+    if (file.size > 10 * 1024 * 1024) throw new Error("PDF가 너무 커요. 10MB 이하로 올려주세요.");
+    const dataUrl = await new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = () => reject(new Error("파일을 읽지 못했어요."));
+      r.readAsDataURL(file);
+    });
+    return { mimeType: "application/pdf", data: dataUrl.split(",")[1] };
+  }
+  // 이미지 축소
+  const img = await new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const i = new Image();
+    i.onload = () => { URL.revokeObjectURL(url); resolve(i); };
+    i.onerror = () => { URL.revokeObjectURL(url); reject(new Error("이미지를 읽지 못했어요.")); };
+    i.src = url;
+  });
+  const MAX = 1600;
+  const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(img.width * scale);
+  canvas.height = Math.round(img.height * scale);
+  canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+  const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+  return { mimeType: "image/jpeg", data: dataUrl.split(",")[1] };
+}
+
+async function runAiGenerate() {
+  const errEl = document.getElementById("import-error");
+  errEl.classList.add("hidden");
+
+  const words = document.getElementById("prompt-word-input").value.trim();
+  if (!words && !_aiFile) {
+    errEl.textContent = "단어를 입력하거나 사진/PDF를 선택해 주세요.";
+    errEl.classList.remove("hidden");
+    return;
+  }
+
+  const betaCode = document.getElementById("beta-code").value.trim();
+  localStorage.setItem("wordgame_beta_code", betaCode);
+
+  const btn = document.getElementById("btn-ai-generate");
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "⏳ 생성 중… (몇 초 걸려요)";
+
+  try {
+    const payload = { betaCode, words };
+    if (_aiFile) payload.file = await prepareAiFile(_aiFile);
+
+    const res = await fetch(AI_WORKER_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "생성에 실패했어요. 잠시 후 다시 시도해 주세요.");
+
+    // 결과 표를 STEP 2 칸에 넣고 바로 미리보기 실행
+    document.getElementById("import-textarea").value = data.table;
+    runImportPreview();
+  } catch (e) {
+    errEl.textContent = e.message || "생성에 실패했어요.";
+    errEl.classList.remove("hidden");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
 }
 
 // 마크다운 표(| a | b |) 형식이면 파이프 구분 텍스트로 변환
@@ -1055,6 +1143,12 @@ document.getElementById("btn-to-menu").addEventListener("click", () => enterStud
 document.getElementById("btn-go-manage").addEventListener("click",    () => enterManage());
 document.getElementById("btn-open-import").addEventListener("click",  () => openImport());
 document.getElementById("btn-copy-prompt").addEventListener("click",  () => copyAiPrompt());
+
+// AI 직접 생성 (베타)
+document.getElementById("btn-ai-file").addEventListener("click", () => document.getElementById("ai-file-input").click());
+document.getElementById("ai-file-input").addEventListener("change", (e) => setAiFile(e.target.files[0] || null));
+document.getElementById("btn-ai-generate").addEventListener("click", () => runAiGenerate());
+document.getElementById("beta-code").value = localStorage.getItem("wordgame_beta_code") || "";
 document.getElementById("btn-import-cancel").addEventListener("click",() => closeImport());
 document.getElementById("btn-import-parse").addEventListener("click", () => runImportPreview());
 document.getElementById("btn-import-add").addEventListener("click",   () => doImport(false));

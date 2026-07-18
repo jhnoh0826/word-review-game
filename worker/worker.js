@@ -1,0 +1,125 @@
+/* =========================================================================
+ *  단어 복습 게임 - AI 중계 서버 (Cloudflare Worker)
+ * =========================================================================
+ *  게임(GitHub Pages)에서 이 서버로 요청하면, 서버에 보관된 제미나이 API 키로
+ *  단어장을 생성해서 돌려줍니다. 키는 Cloudflare 환경변수에만 저장됩니다.
+ *
+ *  환경변수 (Cloudflare 대시보드 → Workers → 이 워커 → Settings → Variables):
+ *    GEMINI_API_KEY  (Secret)  : 제미나이 API 키
+ *    BETA_CODE       (Secret)  : 베타테스터에게만 알려주는 코드 (설정 안 하면 누구나 사용 가능)
+ *    MODEL           (선택)    : 기본값 gemini-2.5-flash
+ * ========================================================================= */
+
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
+function json(obj, status = 200) {
+  return new Response(JSON.stringify(obj), {
+    status,
+    headers: { "Content-Type": "application/json; charset=utf-8", ...CORS_HEADERS },
+  });
+}
+
+function buildPrompt(words, hasFile) {
+  const source = words
+    ? `단어 목록: ${words}`
+    : `첨부한 파일(사진/PDF)에 나오는 영어 단어를 모두 찾아서 정리해줘.`;
+  return `다음 영어 단어들을 초등 고학년~중학생 수준 단어 학습용으로 표로 정리해줘.
+컬럼은 Word / Definition (KR) / Definition / Example Sentence 순서로 만들어줘.
+- Word: 영어 단어의 기본형 (동사는 원형, 명사는 단수형)
+- Definition (KR): 한글 뜻
+- Definition: 영어로 된 쉬운 뜻 풀이
+- Example Sentence: 반드시 해당 단어(또는 그 단어의 자연스러운 변형)를 포함한 예문
+다른 설명 없이 마크다운 표만 출력해줘.
+
+${hasFile && words ? "파일에서 찾은 단어와 아래 단어 목록을 합쳐서 정리해줘.\n" : ""}${source}`;
+}
+
+export default {
+  async fetch(request, env) {
+    if (request.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: CORS_HEADERS });
+    }
+    if (request.method !== "POST") {
+      return json({ error: "POST 요청만 받아요" }, 405);
+    }
+
+    if (!env.GEMINI_API_KEY) {
+      return json({ error: "서버에 API 키가 아직 설정되지 않았어요. (Cloudflare 대시보드에서 GEMINI_API_KEY를 등록하세요)" }, 500);
+    }
+
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return json({ error: "잘못된 요청 형식이에요" }, 400);
+    }
+
+    // 베타 코드 확인 (BETA_CODE가 설정된 경우에만)
+    if (env.BETA_CODE && body.betaCode !== env.BETA_CODE) {
+      return json({ error: "베타 코드가 올바르지 않아요" }, 403);
+    }
+
+    const words = (body.words || "").toString().slice(0, 4000).trim();
+    const file = body.file; // { mimeType: "image/jpeg" | "application/pdf", data: base64 문자열 }
+
+    if (!words && !file) {
+      return json({ error: "단어를 입력하거나 파일을 선택해 주세요" }, 400);
+    }
+    if (file) {
+      if (typeof file.data !== "string" || typeof file.mimeType !== "string") {
+        return json({ error: "파일 형식이 올바르지 않아요" }, 400);
+      }
+      const okTypes = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+      if (!okTypes.includes(file.mimeType)) {
+        return json({ error: "사진(JPG/PNG/WebP) 또는 PDF만 지원해요" }, 400);
+      }
+      // base64 길이 기준 약 10MB 제한
+      if (file.data.length > 14_000_000) {
+        return json({ error: "파일이 너무 커요. 10MB 이하로 올려주세요" }, 400);
+      }
+    }
+
+    const parts = [];
+    if (file) parts.push({ inline_data: { mime_type: file.mimeType, data: file.data } });
+    parts.push({ text: buildPrompt(words, !!file) });
+
+    const model = env.MODEL || "gemini-2.5-flash";
+    let res;
+    try {
+      res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": env.GEMINI_API_KEY,
+          },
+          body: JSON.stringify({ contents: [{ parts }] }),
+        }
+      );
+    } catch {
+      return json({ error: "AI 서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요" }, 502);
+    }
+
+    if (!res.ok) {
+      const status = res.status;
+      if (status === 429) return json({ error: "오늘 사용량 한도를 넘었어요. 내일 다시 시도해 주세요" }, 429);
+      if (status === 400 || status === 403) return json({ error: "API 키가 잘못됐거나 권한이 없어요 (관리자 확인 필요)" }, 502);
+      return json({ error: `AI 서버 오류 (${status}). 잠시 후 다시 시도해 주세요` }, 502);
+    }
+
+    const data = await res.json();
+    const text =
+      data?.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") || "";
+
+    if (!text.includes("|")) {
+      return json({ error: "AI가 단어장을 만들지 못했어요. 단어나 파일을 확인하고 다시 시도해 주세요" }, 502);
+    }
+
+    return json({ table: text });
+  },
+};
