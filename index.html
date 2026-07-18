@@ -63,8 +63,9 @@
                 <span>미리보기 확인 → <b>추가하기</b> 완료! 🎉</span>
               </div>
 
-              <p class="help-sub">구글시트 표를 붙여넣고 싶으면 "📋 표 붙여넣기로 추가"를,
-                 한 단어씩 손으로 쓰고 싶으면 "✍️ 직접 입력하기"를 누르세요.</p>
+              <p class="help-sub">단어는 세트(폴더)로 나눠 저장할 수 있어요 — 추가할 때 "저장할 세트"에서
+                 날짜별·시험범위별 세트를 고르거나 새로 만드세요.
+                 구글시트 표는 "📋 표 붙여넣기로 추가", 한 단어씩은 "✍️ 직접 입력하기"로도 넣을 수 있어요.</p>
             </div>
           </div>
 
@@ -72,7 +73,9 @@
             <div class="help-step-num">3</div>
             <div class="help-step-body">
               <b>게임 시작</b>
-              <p>전체 복습 · 뜻 확인 · 스펠링 · 문장 쓰임 중 골라서 시작하세요.
+              <p>세트가 여러 개면 메뉴의 <span class="help-chip">📂 복습 범위</span>에서
+                 오늘 공부할 세트만 골라 풀 수 있어요.
+                 전체 복습 · 뜻 확인 · 스펠링 · 문장 쓰임 중 골라서 시작하세요.
                  틀린 단어는 <b>오답 노트</b>에 자동으로 모여서 다시 풀 수 있어요.</p>
             </div>
           </div>
@@ -122,6 +125,10 @@
       <div class="menu-hero">
         <h2 id="menu-greeting">반가워요!</h2>
         <p class="subtitle">오늘도 단어 정복하러 가볼까요?</p>
+      </div>
+      <div class="scope-box hidden" id="scope-box">
+        <p class="scope-label">📂 복습 범위 <small>(누르면 선택·해제돼요)</small></p>
+        <div class="scope-chips" id="scope-chips"></div>
       </div>
       <div class="mode-list">
         <button class="mode-btn" data-mode="mixed">
@@ -179,6 +186,11 @@
         <h2 class="manage-title">단어 관리</h2>
         <span class="badge" id="manage-student-badge"></span>
       </div>
+      <div class="set-tabs" id="set-tabs"></div>
+      <div class="set-actions">
+        <button class="btn-set-action" id="btn-set-rename">✏️ 세트 이름 바꾸기</button>
+        <button class="btn-set-action danger" id="btn-set-delete">🗑️ 세트 삭제</button>
+      </div>
       <div class="manage-toolbar">
         <span class="word-count" id="word-count-label">총 0개</span>
         <div class="toolbar-actions">
@@ -193,6 +205,11 @@
     <div id="import-overlay" class="modal-overlay hidden">
       <div class="modal-card import-card">
         <h3 class="modal-title">＋ 단어 추가</h3>
+
+        <div class="import-dest">
+          <label class="form-label">저장할 세트</label>
+          <select class="form-input set-select" id="import-set-select"></select>
+        </div>
 
         <div class="import-step">
           <textarea
@@ -239,6 +256,17 @@
           <button class="btn-secondary" id="btn-import-cancel">취소</button>
           <button class="btn-primary hidden" id="btn-import-add">추가하기</button>
           <button class="btn-primary-red hidden" id="btn-import-replace">전체 교체</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 단어 이동: 세트 선택 모달 -->
+    <div id="setpick-overlay" class="modal-overlay hidden">
+      <div class="modal-card">
+        <h3 class="modal-title">📂 어느 세트로 이동할까요?</h3>
+        <div class="setpick-list" id="setpick-list"></div>
+        <div class="modal-buttons">
+          <button class="btn-secondary" id="btn-setpick-cancel">취소</button>
         </div>
       </div>
     </div>

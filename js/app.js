@@ -15,6 +15,7 @@ const state = {
   combo: 0,           // 연속 정답
   correctCount: 0,    // 맞힌 개수
   answered: false,    // 현재 문제에 답했는지
+  manageSetId: null,  // 단어 관리 화면에서 보고 있는 세트
 };
 
 // ---- 화면 전환 ----
@@ -81,29 +82,73 @@ function stripMarkdown(str) {
     .trim();
 }
 
-// ---- 단어 데이터 (localStorage 우선, 없으면 words.js 초기값) ----
-function loadWords(student) {
+// ---- 단어 세트(폴더) ----
+// 데이터 구조: data.sets = [{ id, name, words: [...] }], data.scope = "all" | [setId...]
+// 구버전(data.words 평면 배열)은 처음 읽을 때 "기본 단어장" 세트로 자동 변환된다.
+
+function cleanWordEntry(w) {
+  return {
+    word: stripMarkdown(w.word),
+    meaning_ko: stripMarkdown(w.meaning_ko),
+    meaning_en: stripMarkdown(w.meaning_en),
+    example: stripMarkdown(w.example),
+  };
+}
+function newSetId() { return "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
+function defaultSetName() { const d = new Date(); return `${d.getMonth() + 1}/${d.getDate()} 단어`; }
+
+function loadSets(student) {
   const data = loadProgress(student);
-  if (Array.isArray(data.words)) {
-    // 예전에 마크다운 기호가 섞인 채로 저장된 데이터를 불러올 때마다 정리
-    return data.words.map(w => ({
-      word: stripMarkdown(w.word),
-      meaning_ko: stripMarkdown(w.meaning_ko),
-      meaning_en: stripMarkdown(w.meaning_en),
-      example: stripMarkdown(w.example),
-    }));
+  if (!Array.isArray(data.sets) || !data.sets.length) {
+    // 구버전 데이터 또는 첫 방문 → 기본 세트로 변환 (기존 단어는 그대로 보존)
+    const base = Array.isArray(data.words) ? data.words : (WORD_DATA[student] || []).map(w => ({ ...w }));
+    data.sets = [{ id: "default", name: "기본 단어장", words: base }];
+    saveProgress(student, data);
   }
-  // 처음 접속 시 words.js 데이터를 localStorage에 복사
-  const seed = (WORD_DATA[student] || []).map(w => ({ ...w }));
-  data.words = seed;
-  saveProgress(student, data);
-  return seed;
+  return data.sets.map(s => ({ ...s, words: (s.words || []).map(cleanWordEntry) }));
 }
-function saveWords(student, words) {
+function saveSets(student, sets) {
   const data = loadProgress(student);
-  data.words = words;
+  data.sets = sets;
   saveProgress(student, data);
 }
+
+// 퀴즈 범위: "all" 또는 세트 id 배열 (삭제된 세트 id는 자동 정리)
+function getScope(student) {
+  const data = loadProgress(student);
+  let scope = data.scope || "all";
+  if (Array.isArray(scope)) {
+    const sets = loadSets(student);
+    scope = scope.filter(id => sets.some(s => s.id === id));
+    if (!scope.length) scope = "all";
+  }
+  return scope;
+}
+function setScope(student, scope) {
+  const data = loadProgress(student);
+  data.scope = scope;
+  saveProgress(student, data);
+}
+
+// 세트 목록에서 단어를 모아 중복(같은 철자) 제거
+function collectWords(sets) {
+  const seen = new Set();
+  const out = [];
+  sets.forEach(s => s.words.forEach(w => {
+    const k = w.word.toLowerCase();
+    if (!seen.has(k)) { seen.add(k); out.push(w); }
+  }));
+  return out;
+}
+// 선택된 범위의 단어 (퀴즈 출제용)
+function scopedWords(student) {
+  const sets = loadSets(student);
+  const scope = getScope(student);
+  const chosen = scope === "all" ? sets : sets.filter(s => scope.includes(s.id));
+  return collectWords(chosen.length ? chosen : sets);
+}
+// 모든 세트의 단어 (오답 노트용 - 범위와 무관)
+function allWords(student) { return collectWords(loadSets(student)); }
 
 function addWrongWord(student, word) {
   const data = loadProgress(student);
@@ -331,14 +376,17 @@ function startRound(mode) {
 
   let sourceWords;
   if (mode === "wrong") {
+    // 오답 노트는 복습 범위와 무관하게 모든 세트에서 틀린 단어를 모아 출제
     const wrongList = getWrongWords(state.student);
-    sourceWords = state.words.filter((w) => wrongList.includes(w.word));
+    sourceWords = allWords(state.student).filter((w) => wrongList.includes(w.word));
     if (sourceWords.length === 0) {
       alert("오답 노트가 비어 있어요! 먼저 다른 모드로 복습해 보세요.");
       return;
     }
+    state.words = allWords(state.student); // 오답 선지도 전체 단어에서 뽑도록 (메뉴로 돌아가면 다시 범위 적용됨)
   } else {
     sourceWords = state.words;
+    if (sourceWords.length === 0) return;
   }
 
   // 단어를 섞어 한 판 분량만큼 문제 생성 (단어가 적으면 반복 사용)
@@ -558,21 +606,69 @@ function finishRound() {
 
 function enterStudent(student) {
   state.student = student;
-  state.words = loadWords(student);
+  state.words = scopedWords(student);
   const p = getProfile(student);
   document.getElementById("menu-student-name").textContent = `${p.name} ${p.emoji}`;
   document.getElementById("menu-greeting").textContent = `${p.name}, 반가워요!`;
   document.getElementById("menu-best-score").textContent = getBestScore(student);
 
+  renderScopeChips();
+  updateMenuState();
+  show("menu");
+}
+
+// 모드 버튼 활성화·빈 목록 경고·오답 개수 갱신 (범위 변경/단어 추가 후에도 호출)
+function updateMenuState() {
   const empty = state.words.length === 0;
   document.getElementById("empty-warning").classList.toggle("hidden", !empty);
   document.querySelectorAll(".mode-btn").forEach((b) => { b.disabled = empty; b.style.opacity = empty ? 0.4 : 1; });
 
-  const wrongCount = getWrongWords(student).filter((w) => state.words.some((x) => x.word === w)).length;
+  const all = allWords(state.student);
+  const wrongCount = getWrongWords(state.student).filter((w) => all.some((x) => x.word === w)).length;
   document.getElementById("wrong-count-text").textContent =
     wrongCount > 0 ? `틀린 단어 ${wrongCount}개 다시 풀기` : "틀린 단어 다시 풀기";
+}
 
-  show("menu");
+// 복습 범위 칩 렌더링
+function renderScopeChips() {
+  const box = document.getElementById("scope-box");
+  const wrap = document.getElementById("scope-chips");
+  const sets = loadSets(state.student);
+  const scope = getScope(state.student);
+
+  // 세트가 하나뿐이면 범위 선택이 의미 없으므로 숨김
+  box.classList.toggle("hidden", sets.length <= 1);
+  wrap.innerHTML = "";
+  if (sets.length <= 1) return;
+
+  function makeChip(label, active, onClick) {
+    const b = document.createElement("button");
+    b.className = "scope-chip" + (active ? " active" : "");
+    b.textContent = label;
+    b.addEventListener("click", onClick);
+    wrap.appendChild(b);
+  }
+
+  makeChip("전체", scope === "all", () => {
+    setScope(state.student, "all");
+    refreshScope();
+  });
+  sets.forEach((s) => {
+    const active = Array.isArray(scope) && scope.includes(s.id);
+    makeChip(`${s.name} (${s.words.length})`, active, () => {
+      let next = Array.isArray(scope) ? [...scope] : [];
+      if (next.includes(s.id)) next = next.filter((id) => id !== s.id);
+      else next.push(s.id);
+      setScope(state.student, next.length ? next : "all");
+      refreshScope();
+    });
+  });
+}
+
+function refreshScope() {
+  state.words = scopedWords(state.student);
+  renderScopeChips();
+  updateMenuState();
 }
 
 /* =========================================================================
@@ -584,8 +680,115 @@ let editingIndex = null; // null = 추가 모드, 숫자 = 수정 모드
 function enterManage() {
   const p = getProfile(state.student);
   document.getElementById("manage-student-badge").textContent = `${p.emoji} ${p.name}`;
+  const sets = loadSets(state.student);
+  if (!sets.some((s) => s.id === state.manageSetId)) state.manageSetId = sets[0].id;
+  renderSetTabs();
   renderWordList();
   show("manage");
+}
+
+// ---- 세트 탭 ----
+function renderSetTabs() {
+  const wrap = document.getElementById("set-tabs");
+  const sets = loadSets(state.student);
+  wrap.innerHTML = "";
+
+  sets.forEach((s) => {
+    const b = document.createElement("button");
+    b.className = "set-tab" + (s.id === state.manageSetId ? " active" : "");
+    b.textContent = `📂 ${s.name} (${s.words.length})`;
+    b.addEventListener("click", () => {
+      state.manageSetId = s.id;
+      renderSetTabs();
+      renderWordList();
+    });
+    wrap.appendChild(b);
+  });
+
+  const add = document.createElement("button");
+  add.className = "set-tab set-tab-add";
+  add.textContent = "＋ 새 세트";
+  add.addEventListener("click", () => createNewSet());
+  wrap.appendChild(add);
+}
+
+function uniqueSetName(base, sets) {
+  let name = base, n = 2;
+  while (sets.some((s) => s.name === name)) name = `${base} (${n++})`;
+  return name;
+}
+
+function createNewSet(nameHint) {
+  const sets = loadSets(state.student);
+  const suggested = uniqueSetName(nameHint || defaultSetName(), sets);
+  const name = prompt("새 세트 이름을 입력하세요\n(예: 7/18 단어, 중간고사 범위, Unit 5)", suggested);
+  if (name === null) return null;
+  const set = { id: newSetId(), name: (name.trim() || suggested).slice(0, 30), words: [] };
+  sets.push(set);
+  saveSets(state.student, sets);
+  state.manageSetId = set.id;
+  renderSetTabs();
+  renderWordList();
+  return set.id;
+}
+
+function renameCurrentSet() {
+  const sets = loadSets(state.student);
+  const set = sets.find((s) => s.id === state.manageSetId);
+  if (!set) return;
+  const name = prompt("세트 이름을 입력하세요", set.name);
+  if (name === null || !name.trim()) return;
+  set.name = name.trim().slice(0, 30);
+  saveSets(state.student, sets);
+  renderSetTabs();
+}
+
+function deleteCurrentSet() {
+  const sets = loadSets(state.student);
+  if (sets.length <= 1) { alert("마지막 세트는 삭제할 수 없어요."); return; }
+  const set = sets.find((s) => s.id === state.manageSetId);
+  if (!set) return;
+  if (!confirm(`"${set.name}" 세트를 삭제할까요?\n세트 안의 단어 ${set.words.length}개도 함께 삭제돼요.`)) return;
+  const next = sets.filter((s) => s.id !== set.id);
+  saveSets(state.student, next);
+  state.manageSetId = next[0].id;
+  state.words = scopedWords(state.student);
+  renderSetTabs();
+  renderWordList();
+}
+
+// ---- 단어를 다른 세트로 이동 ----
+function openSetPicker(wordIndex) {
+  const sets = loadSets(state.student);
+  const others = sets.filter((s) => s.id !== state.manageSetId);
+  const list = document.getElementById("setpick-list");
+  list.innerHTML = "";
+  others.forEach((s) => {
+    const b = document.createElement("button");
+    b.className = "setpick-item";
+    b.textContent = `📂 ${s.name} (${s.words.length})`;
+    b.addEventListener("click", () => {
+      moveWordToSet(wordIndex, s.id);
+      closeSetPicker();
+    });
+    list.appendChild(b);
+  });
+  document.getElementById("setpick-overlay").classList.remove("hidden");
+}
+function closeSetPicker() { document.getElementById("setpick-overlay").classList.add("hidden"); }
+
+function moveWordToSet(wordIndex, destId) {
+  const sets = loadSets(state.student);
+  const from = sets.find((s) => s.id === state.manageSetId);
+  const to = sets.find((s) => s.id === destId);
+  if (!from || !to) return;
+  const [w] = from.words.splice(wordIndex, 1);
+  if (!w) return;
+  if (!to.words.some((x) => x.word.toLowerCase() === w.word.toLowerCase())) to.words.push(w);
+  saveSets(state.student, sets);
+  state.words = scopedWords(state.student);
+  renderSetTabs();
+  renderWordList();
 }
 
 /* =========================================================================
@@ -703,19 +906,27 @@ function deleteStudent() {
   renderStudentCards();
 }
 
+function currentSet() {
+  const sets = loadSets(state.student);
+  return sets.find((s) => s.id === state.manageSetId) || sets[0];
+}
+
 function renderWordList() {
-  const words = loadWords(state.student);
+  const sets = loadSets(state.student);
+  const set = currentSet();
+  const words = set.words;
   document.getElementById("word-count-label").textContent = `총 ${words.length}개`;
   const list = document.getElementById("word-list");
   list.innerHTML = "";
 
   if (words.length === 0) {
     list.innerHTML = `<p style="text-align:center;color:rgba(255,255,255,0.35);padding:32px 0;font-weight:700;">
-      단어가 없어요. 위 버튼으로 추가해보세요!
+      이 세트에 단어가 없어요. 위 ＋ 추가 버튼으로 넣어보세요!
     </p>`;
     return;
   }
 
+  const canMove = sets.length > 1;
   words.forEach((w, i) => {
     const card = document.createElement("div");
     card.className = "word-card";
@@ -725,12 +936,15 @@ function renderWordList() {
         <div class="word-card-ko">${escapeHtml(w.meaning_ko)}</div>
       </div>
       <div class="word-card-actions">
+        ${canMove ? `<button class="btn-icon btn-move" data-i="${i}" title="다른 세트로 이동">📂</button>` : ""}
         <button class="btn-icon btn-edit" data-i="${i}" title="수정">✏️</button>
         <button class="btn-icon btn-delete" data-i="${i}" title="삭제">🗑️</button>
       </div>`;
     list.appendChild(card);
   });
 
+  list.querySelectorAll(".btn-move").forEach(btn =>
+    btn.addEventListener("click", () => openSetPicker(Number(btn.dataset.i))));
   list.querySelectorAll(".btn-edit").forEach(btn =>
     btn.addEventListener("click", () => openModal(Number(btn.dataset.i))));
   list.querySelectorAll(".btn-delete").forEach(btn =>
@@ -744,7 +958,7 @@ function openModal(index = null) {
   document.getElementById("form-error").classList.add("hidden");
 
   if (isEdit) {
-    const w = loadWords(state.student)[index];
+    const w = currentSet().words[index];
     document.getElementById("f-word").value    = w.word;
     document.getElementById("f-ko").value      = w.meaning_ko;
     document.getElementById("f-en").value      = w.meaning_en || "";
@@ -776,28 +990,32 @@ function saveWordForm() {
   }
   document.getElementById("form-error").classList.add("hidden");
 
-  const words = loadWords(state.student);
+  const sets = loadSets(state.student);
+  const set = sets.find((s) => s.id === state.manageSetId) || sets[0];
   const entry = { word, meaning_ko: ko, meaning_en: en, example };
 
   if (editingIndex !== null) {
-    words[editingIndex] = entry;
+    set.words[editingIndex] = entry;
   } else {
-    words.push(entry);
+    set.words.push(entry);
   }
 
-  saveWords(state.student, words);
-  state.words = words; // 즉시 반영
+  saveSets(state.student, sets);
+  state.words = scopedWords(state.student); // 즉시 반영
   closeModal();
+  renderSetTabs();
   renderWordList();
 }
 
 function deleteWord(index) {
-  const words = loadWords(state.student);
-  const target = words[index];
+  const sets = loadSets(state.student);
+  const set = sets.find((s) => s.id === state.manageSetId) || sets[0];
+  const target = set.words[index];
   if (!confirm(`"${target.word}" 을(를) 삭제할까요?`)) return;
-  words.splice(index, 1);
-  saveWords(state.student, words);
-  state.words = words;
+  set.words.splice(index, 1);
+  saveSets(state.student, sets);
+  state.words = scopedWords(state.student);
+  renderSetTabs();
   renderWordList();
 }
 
@@ -810,6 +1028,22 @@ let _parsedImport = []; // 파싱된 결과를 임시 저장
 function openImport() {
   _parsedImport = [];
   clearAiFiles();
+  // 저장할 세트 선택지 채우기 (기본값: 지금 보고 있는 세트)
+  const sel = document.getElementById("import-set-select");
+  const sets = loadSets(state.student);
+  sel.innerHTML = "";
+  sets.forEach((s) => {
+    const o = document.createElement("option");
+    o.value = s.id;
+    o.textContent = `📂 ${s.name} (${s.words.length}개)`;
+    sel.appendChild(o);
+  });
+  const newOpt = document.createElement("option");
+  newOpt.value = "__new__";
+  newOpt.textContent = `➕ 새 세트로 저장 (${defaultSetName()})`;
+  sel.appendChild(newOpt);
+  if (sets.some((s) => s.id === state.manageSetId)) sel.value = state.manageSetId;
+
   document.querySelector(".paste-detail").open = false;
   document.getElementById("import-textarea").value = "";
   document.getElementById("prompt-word-input").value = "";
@@ -1066,23 +1300,34 @@ function runImportPreview() {
 
 function doImport(replace) {
   if (!_parsedImport.length) return;
-  const current = replace ? [] : loadWords(state.student);
+
+  let sets = loadSets(state.student);
+  let destId = document.getElementById("import-set-select").value;
+
+  // 새 세트로 저장
+  if (destId === "__new__") {
+    const set = { id: newSetId(), name: uniqueSetName(defaultSetName(), sets), words: [] };
+    sets.push(set);
+    destId = set.id;
+  }
+  const set = sets.find((s) => s.id === destId) || sets[0];
+
   // 중복 단어는 덮어쓰기
-  const merged = [...current];
+  const merged = replace ? [] : [...set.words];
   _parsedImport.forEach(w => {
     const idx = merged.findIndex(x => x.word.toLowerCase() === w.word.toLowerCase());
     if (idx >= 0) merged[idx] = w;
     else merged.push(w);
   });
-  saveWords(state.student, merged);
-  state.words = merged;
-  closeImport();
-  renderWordList();
+  set.words = merged;
+  saveSets(state.student, sets);
 
-  // 메뉴 단어 수도 갱신
-  const empty = merged.length === 0;
-  document.getElementById("empty-warning").classList.toggle("hidden", !empty);
-  document.querySelectorAll(".mode-btn").forEach(b => { b.disabled = empty; b.style.opacity = empty ? 0.4 : 1; });
+  state.manageSetId = set.id;
+  state.words = scopedWords(state.student);
+  closeImport();
+  renderSetTabs();
+  renderWordList();
+  updateMenuState();
 }
 
 /* =========================================================================
@@ -1142,7 +1387,7 @@ document.getElementById("btn-import-cancel").addEventListener("click",() => clos
 document.getElementById("btn-import-parse").addEventListener("click", () => runImportPreview());
 document.getElementById("btn-import-add").addEventListener("click",   () => doImport(false));
 document.getElementById("btn-import-replace").addEventListener("click",() => {
-  if (!confirm(`기존 단어를 모두 지우고 붙여넣은 ${_parsedImport.length}개로 교체할까요?`)) return;
+  if (!confirm(`선택한 세트의 기존 단어를 모두 지우고 ${_parsedImport.length}개로 교체할까요?`)) return;
   doImport(true);
 });
 document.getElementById("import-overlay").addEventListener("click", e => {
@@ -1151,12 +1396,25 @@ document.getElementById("import-overlay").addEventListener("click", e => {
 document.getElementById("btn-back-menu").addEventListener("click", () => enterStudent(state.student));
 document.getElementById("btn-open-add").addEventListener("click", () => openImport());
 document.getElementById("btn-reset-words").addEventListener("click", () => {
-  if (!confirm("원래 단어 목록으로 초기화할까요?\n직접 추가/수정한 단어는 모두 사라져요.")) return;
+  if (!confirm("원래 단어 목록으로 초기화할까요?\n모든 세트와 직접 추가/수정한 단어가 사라지고, 처음 단어장 하나만 남아요.")) return;
   const data = loadProgress(state.student);
   delete data.words;
+  data.sets = [{ id: "default", name: "기본 단어장", words: (WORD_DATA[state.student] || []).map(w => ({ ...w })) }];
+  data.scope = "all";
   saveProgress(state.student, data);
-  state.words = loadWords(state.student);
+  state.manageSetId = "default";
+  state.words = scopedWords(state.student);
+  renderSetTabs();
   renderWordList();
+  updateMenuState();
+});
+
+// 세트 관리 버튼
+document.getElementById("btn-set-rename").addEventListener("click", renameCurrentSet);
+document.getElementById("btn-set-delete").addEventListener("click", deleteCurrentSet);
+document.getElementById("btn-setpick-cancel").addEventListener("click", closeSetPicker);
+document.getElementById("setpick-overlay").addEventListener("click", (e) => {
+  if (e.target === document.getElementById("setpick-overlay")) closeSetPicker();
 });
 
 // 모달

@@ -271,6 +271,34 @@ body {
 }
 .menu-hero .subtitle { font-size: 16px; color: rgba(255,255,255,0.5); font-weight: 600; }
 
+/* ── 복습 범위 (세트 선택) ── */
+.scope-box {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 16px; padding: 14px 16px;
+  margin-bottom: 18px;
+}
+.scope-label {
+  font-size: 13px; font-weight: 800; letter-spacing: 0.5px;
+  color: rgba(255,255,255,0.6); margin-bottom: 10px;
+}
+.scope-label small { font-weight: 600; color: rgba(255,255,255,0.3); }
+.scope-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.scope-chip {
+  background: rgba(255,255,255,0.07);
+  border: 1.5px solid rgba(255,255,255,0.18);
+  color: rgba(255,255,255,0.6); font-family: inherit;
+  font-size: 13.5px; font-weight: 700;
+  padding: 8px 14px; border-radius: 999px; cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.scope-chip:hover { background: rgba(255,255,255,0.14); }
+.scope-chip.active {
+  background: rgba(108,99,255,0.3);
+  border-color: var(--primary);
+  color: #fff;
+}
+
 .mode-list { display: flex; flex-direction: column; gap: 12px; }
 
 .mode-btn {
@@ -561,6 +589,69 @@ body {
   flex: 1; font-size: 24px; font-weight: 900; color: #fff;
   text-align: center;
 }
+
+/* ── 세트 탭 ── */
+.set-tabs {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  margin-bottom: 10px;
+}
+.set-tab {
+  background: rgba(255,255,255,0.06);
+  border: 1.5px solid rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.6); font-family: inherit;
+  font-size: 13.5px; font-weight: 700;
+  padding: 9px 14px; border-radius: 12px; cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.set-tab:hover { background: rgba(255,255,255,0.12); }
+.set-tab.active {
+  background: rgba(108,99,255,0.3);
+  border-color: var(--primary);
+  color: #fff;
+}
+.set-tab-add {
+  border-style: dashed;
+  color: rgba(255,255,255,0.4);
+}
+.set-tab-add:hover { color: rgba(255,255,255,0.75); }
+
+.set-actions { display: flex; gap: 8px; margin-bottom: 14px; }
+.btn-set-action {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.18);
+  color: rgba(255,255,255,0.45); font-family: inherit;
+  font-size: 12.5px; font-weight: 700;
+  padding: 7px 12px; border-radius: 10px; cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.btn-set-action:hover { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.8); }
+.btn-set-action.danger:hover {
+  background: rgba(231,76,60,0.15);
+  border-color: rgba(231,76,60,0.4);
+  color: #f1948a;
+}
+
+/* 세트 이동 선택 모달 */
+.setpick-list { display: flex; flex-direction: column; gap: 8px; }
+.setpick-item {
+  background: rgba(255,255,255,0.07);
+  border: 1.5px solid rgba(255,255,255,0.15);
+  color: #fff; font-family: inherit;
+  font-size: 15px; font-weight: 700; text-align: left;
+  padding: 14px 16px; border-radius: 14px; cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.setpick-item:hover { background: rgba(108,99,255,0.25); border-color: var(--primary); }
+
+/* 이동 버튼 (단어 카드) */
+.btn-move { background: rgba(255,212,96,0.18); color: #ffd460; }
+.btn-move:hover { background: rgba(255,212,96,0.35); }
+
+/* 가져오기 모달: 저장할 세트 선택 */
+.import-dest { margin-bottom: 14px; }
+.import-dest .form-label { display: block; margin-bottom: 6px; }
+.set-select { cursor: pointer; }
+.set-select option { background: #1e2347; color: #fff; }
 
 .manage-toolbar {
   display: flex; justify-content: space-between; align-items: center;
