@@ -809,8 +809,7 @@ let _parsedImport = []; // 파싱된 결과를 임시 저장
 
 function openImport() {
   _parsedImport = [];
-  setAiFile(null);
-  document.getElementById("ai-file-input").value = "";
+  clearAiFiles();
   document.querySelector(".paste-detail").open = false;
   document.getElementById("import-textarea").value = "";
   document.getElementById("prompt-word-input").value = "";
@@ -833,11 +832,36 @@ function closeImport() {
 
 const AI_WORKER_URL = "https://word-review-ai.jh-noh0826.workers.dev";
 
-let _aiFile = null; // 선택된 파일 (File 객체)
+let _aiFiles = []; // 선택된 파일 목록 (File 객체들)
 
-function setAiFile(file) {
-  _aiFile = file;
-  document.getElementById("ai-file-name").textContent = file ? file.name : "선택된 파일 없음";
+function renderAiFileName() {
+  const el = document.getElementById("ai-file-name");
+  const clearBtn = document.getElementById("btn-ai-file-clear");
+  if (!_aiFiles.length) {
+    el.textContent = "선택된 파일 없음";
+    clearBtn.classList.add("hidden");
+  } else if (_aiFiles.length === 1) {
+    el.textContent = _aiFiles[0].name;
+    clearBtn.classList.remove("hidden");
+  } else {
+    el.textContent = `${_aiFiles[0].name} 외 ${_aiFiles.length - 1}개`;
+    clearBtn.classList.remove("hidden");
+  }
+}
+
+// 파일을 추가로 선택하면 기존 선택에 누적 (같은 이름+크기는 중복 제외)
+function addAiFiles(fileList) {
+  for (const f of fileList) {
+    if (!_aiFiles.some((x) => x.name === f.name && x.size === f.size)) _aiFiles.push(f);
+  }
+  if (_aiFiles.length > 8) _aiFiles = _aiFiles.slice(0, 8);
+  renderAiFileName();
+}
+
+function clearAiFiles() {
+  _aiFiles = [];
+  document.getElementById("ai-file-input").value = "";
+  renderAiFileName();
 }
 
 // 이미지: 캔버스로 축소(최대 1600px, JPEG)해서 용량·토큰 절약. PDF: 그대로 base64.
@@ -875,7 +899,7 @@ async function runAiGenerate() {
   errEl.classList.add("hidden");
 
   const words = document.getElementById("prompt-word-input").value.trim();
-  if (!words && !_aiFile) {
+  if (!words && !_aiFiles.length) {
     errEl.textContent = "단어를 입력하거나 사진/PDF를 선택해 주세요.";
     errEl.classList.remove("hidden");
     return;
@@ -891,7 +915,10 @@ async function runAiGenerate() {
 
   try {
     const payload = { betaCode, words };
-    if (_aiFile) payload.file = await prepareAiFile(_aiFile);
+    if (_aiFiles.length) {
+      payload.files = [];
+      for (const f of _aiFiles) payload.files.push(await prepareAiFile(f));
+    }
 
     const res = await fetch(AI_WORKER_URL, {
       method: "POST",
@@ -1104,7 +1131,11 @@ document.getElementById("btn-manual-one").addEventListener("click", () => { clos
 
 // AI 직접 생성 (베타)
 document.getElementById("btn-ai-file").addEventListener("click", () => document.getElementById("ai-file-input").click());
-document.getElementById("ai-file-input").addEventListener("change", (e) => setAiFile(e.target.files[0] || null));
+document.getElementById("ai-file-input").addEventListener("change", (e) => {
+  addAiFiles(e.target.files);
+  e.target.value = ""; // 같은 파일을 다시 선택해도 change가 발생하도록 초기화
+});
+document.getElementById("btn-ai-file-clear").addEventListener("click", () => clearAiFiles());
 document.getElementById("btn-ai-generate").addEventListener("click", () => runAiGenerate());
 document.getElementById("beta-code").value = localStorage.getItem("wordgame_beta_code") || "";
 document.getElementById("btn-import-cancel").addEventListener("click",() => closeImport());

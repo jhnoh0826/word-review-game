@@ -26,7 +26,7 @@ function json(obj, status = 200) {
 function buildPrompt(words, hasFile) {
   const source = words
     ? `단어 목록: ${words}`
-    : `첨부한 파일(사진/PDF)에 나오는 영어 단어를 모두 찾아서 정리해줘.`;
+    : `첨부한 파일들(사진/PDF)에 나오는 영어 단어를 모두 찾아서 정리해줘. 파일이 여러 개면 전부 확인해줘.`;
   return `다음 영어 단어들을 초등 고학년~중학생 수준 단어 학습용으로 표로 정리해줘.
 컬럼은 Word / Definition (KR) / Definition / Example Sentence 순서로 만들어줘.
 - Word: 영어 단어의 기본형 (동사는 원형, 명사는 단수형)
@@ -86,28 +86,33 @@ export default {
     }
 
     const words = (body.words || "").toString().slice(0, 4000).trim();
-    const file = body.file; // { mimeType: "image/jpeg" | "application/pdf", data: base64 문자열 }
+    // files: [{ mimeType, data(base64) }, ...]  (구버전 호환: file 단일 객체도 허용)
+    const files = Array.isArray(body.files) ? body.files : (body.file ? [body.file] : []);
 
-    if (!words && !file) {
+    if (!words && !files.length) {
       return json({ error: "단어를 입력하거나 파일을 선택해 주세요" }, 400);
     }
-    if (file) {
-      if (typeof file.data !== "string" || typeof file.mimeType !== "string") {
+    if (files.length > 8) {
+      return json({ error: "파일은 한 번에 8개까지만 올릴 수 있어요" }, 400);
+    }
+    const okTypes = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+    let totalSize = 0;
+    for (const f of files) {
+      if (typeof f?.data !== "string" || typeof f?.mimeType !== "string") {
         return json({ error: "파일 형식이 올바르지 않아요" }, 400);
       }
-      const okTypes = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
-      if (!okTypes.includes(file.mimeType)) {
+      if (!okTypes.includes(f.mimeType)) {
         return json({ error: "사진(JPG/PNG/WebP) 또는 PDF만 지원해요" }, 400);
       }
-      // base64 길이 기준 약 10MB 제한
-      if (file.data.length > 14_000_000) {
-        return json({ error: "파일이 너무 커요. 10MB 이하로 올려주세요" }, 400);
-      }
+      totalSize += f.data.length;
+    }
+    // base64 길이 기준 합계 약 13MB 제한
+    if (totalSize > 18_000_000) {
+      return json({ error: "파일 용량 합계가 너무 커요. 장수를 줄이거나 작은 파일로 올려주세요" }, 400);
     }
 
-    const parts = [];
-    if (file) parts.push({ inline_data: { mime_type: file.mimeType, data: file.data } });
-    parts.push({ text: buildPrompt(words, !!file) });
+    const parts = files.map((f) => ({ inline_data: { mime_type: f.mimeType, data: f.data } }));
+    parts.push({ text: buildPrompt(words, files.length > 0) });
 
     // gemini-flash-latest: 구글이 최신 flash 모델로 자동 연결해주는 별칭 (모델 세대가 바뀌어도 계속 동작)
     const model = MODEL || "gemini-flash-latest";
