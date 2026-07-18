@@ -811,6 +811,7 @@ function openImport() {
   _parsedImport = [];
   setAiFile(null);
   document.getElementById("ai-file-input").value = "";
+  document.querySelector(".paste-detail").open = false;
   document.getElementById("import-textarea").value = "";
   document.getElementById("prompt-word-input").value = "";
   document.getElementById("import-preview").classList.add("hidden");
@@ -820,48 +821,6 @@ function openImport() {
   document.getElementById("btn-import-parse").classList.remove("hidden");
   document.getElementById("import-overlay").classList.remove("hidden");
   setTimeout(() => document.getElementById("prompt-word-input").focus(), 100);
-}
-
-// 입력한 단어 목록으로 AI(GPT/제미나이)용 요청 프롬프트를 만들어 클립보드에 복사
-// 단어를 입력하지 않으면 PDF/사진 첨부용 프롬프트가 만들어진다.
-function buildAiPrompt(wordListText) {
-  const source = wordListText
-    ? `단어 목록: ${wordListText}`
-    : `첨부한 파일(사진/PDF)에 나오는 영어 단어들을 모두 찾아서 정리해줘.`;
-  return `다음 영어 단어들을 초등 고학년~중학생 수준 단어 학습용으로 표로 정리해줘.
-컬럼은 Word / Definition (KR) / Definition / Example Sentence 순서로 만들어줘.
-- Definition (KR): 한글 뜻
-- Definition: 영어로 된 뜻 풀이
-- Example Sentence: 반드시 해당 단어(또는 그 단어의 변형)를 포함한 예문
-마크다운 표 형식으로 출력해줘.
-
-${source}`;
-}
-
-async function copyAiPrompt() {
-  const input = document.getElementById("prompt-word-input");
-  const errEl = document.getElementById("import-error");
-  errEl.classList.add("hidden");
-
-  const words = input.value.trim();
-  const prompt = buildAiPrompt(words);
-  const btn = document.getElementById("btn-copy-prompt");
-
-  try {
-    await navigator.clipboard.writeText(prompt);
-  } catch (e) {
-    errEl.textContent = "클립보드 복사에 실패했어요. 직접 선택해서 복사해 주세요.";
-    errEl.classList.remove("hidden");
-    return;
-  }
-
-  const original = "📋 AI 프롬프트 복사";
-  btn.textContent = words ? "✅ 복사 완료!" : "✅ 파일 첨부용 프롬프트 복사됨!";
-  btn.classList.add("copied");
-  setTimeout(() => {
-    btn.textContent = original;
-    btn.classList.remove("copied");
-  }, 2200);
 }
 
 function closeImport() {
@@ -1141,8 +1100,7 @@ document.getElementById("btn-to-menu").addEventListener("click", () => enterStud
 
 // 단어 관리 화면
 document.getElementById("btn-go-manage").addEventListener("click",    () => enterManage());
-document.getElementById("btn-open-import").addEventListener("click",  () => openImport());
-document.getElementById("btn-copy-prompt").addEventListener("click",  () => copyAiPrompt());
+document.getElementById("btn-manual-one").addEventListener("click", () => { closeImport(); openModal(null); });
 
 // AI 직접 생성 (베타)
 document.getElementById("btn-ai-file").addEventListener("click", () => document.getElementById("ai-file-input").click());
@@ -1160,7 +1118,7 @@ document.getElementById("import-overlay").addEventListener("click", e => {
   if (e.target === document.getElementById("import-overlay")) closeImport();
 });
 document.getElementById("btn-back-menu").addEventListener("click", () => enterStudent(state.student));
-document.getElementById("btn-open-add").addEventListener("click", () => openModal(null));
+document.getElementById("btn-open-add").addEventListener("click", () => openImport());
 document.getElementById("btn-reset-words").addEventListener("click", () => {
   if (!confirm("원래 단어 목록으로 초기화할까요?\n직접 추가/수정한 단어는 모두 사라져요.")) return;
   const data = loadProgress(state.student);

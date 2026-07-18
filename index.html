@@ -50,33 +50,21 @@
             <div class="help-step-body">
               <b>단어 넣기</b>
               <p>학생 선택 → <span class="help-chip">⚙️ 단어 목록 관리</span> →
-                 <span class="help-chip">📋 붙여넣기 가져오기</span></p>
+                 <span class="help-chip">＋ 추가</span></p>
 
-              <p class="help-method">✍️ 방법 1 · 단어를 직접 입력할 때</p>
               <div class="help-flow">
-                <span>STEP 1 칸에 복습할 단어를 입력하고 <b>AI 프롬프트 복사</b> 클릭</span>
+                <span>복습할 단어를 입력하거나, <b>📷 사진/PDF 선택</b>으로 교재 사진·PDF를 올리세요
+                  <small>(둘 다 해도 돼요)</small></span>
                 <span class="help-arrow">↓</span>
-                <span>GPT나 제미나이 채팅창에 붙여넣기 → 표로 정리된 답변이 나와요</span>
+                <span><b>베타 코드</b>를 입력하세요 <small>(안내받은 암호 · 한 번 넣으면 기억돼요)</small></span>
                 <span class="help-arrow">↓</span>
-                <span>답변 표를 통째로 복사해서 게임의 STEP 2 칸에 붙여넣기</span>
+                <span><b>🤖 AI로 바로 생성</b> 클릭 → 몇 초 뒤 AI가 뜻과 예문까지 만들어줘요</span>
                 <span class="help-arrow">↓</span>
-                <span><b>미리보기</b> → <b>추가하기</b> 완료! 🎉</span>
+                <span>미리보기 확인 → <b>추가하기</b> 완료! 🎉</span>
               </div>
 
-              <p class="help-method">📷 방법 2 · 교재 사진이나 PDF 파일로 넣을 때</p>
-              <div class="help-flow">
-                <span>STEP 1 단어 칸을 <b>비워둔 채</b> <b>AI 프롬프트 복사</b> 클릭
-                  <small>"파일 첨부용 프롬프트"가 자동으로 복사돼요</small></span>
-                <span class="help-arrow">↓</span>
-                <span>GPT나 제미나이 채팅창에서 📎(첨부) 버튼으로 <b>사진·PDF 올리기</b> + 복사한 프롬프트 붙여넣기</span>
-                <span class="help-arrow">↓</span>
-                <span>AI가 파일 속 단어를 찾아 표로 정리해줘요 → 표를 통째로 복사</span>
-                <span class="help-arrow">↓</span>
-                <span>게임의 STEP 2 칸에 붙여넣기 → <b>미리보기</b> → <b>추가하기</b> 🎉</span>
-              </div>
-
-              <p class="help-sub">구글시트에서 복사한 표도 그대로 붙여넣을 수 있고,
-                 ＋ 추가 버튼으로 한 단어씩 직접 넣을 수도 있어요.</p>
+              <p class="help-sub">구글시트 표를 붙여넣고 싶으면 "📋 표 붙여넣기로 추가"를,
+                 한 단어씩 손으로 쓰고 싶으면 "✍️ 직접 입력하기"를 누르세요.</p>
             </div>
           </div>
 
@@ -194,7 +182,6 @@
       <div class="manage-toolbar">
         <span class="word-count" id="word-count-label">총 0개</span>
         <div class="toolbar-actions">
-          <button class="btn-import" id="btn-open-import">📋 붙여넣기 가져오기</button>
           <button class="btn-add" id="btn-open-add">＋ 추가</button>
         </div>
       </div>
@@ -202,17 +189,16 @@
       <button class="btn-reset" id="btn-reset-words">↺ 원래 단어로 초기화</button>
     </section>
 
-    <!-- 붙여넣기 가져오기 모달 -->
+    <!-- 단어 추가 모달 (AI 생성) -->
     <div id="import-overlay" class="modal-overlay hidden">
       <div class="modal-card import-card">
-        <h3 class="modal-title">📋 붙여넣기로 가져오기</h3>
+        <h3 class="modal-title">＋ 단어 추가</h3>
 
         <div class="import-step">
-          <p class="step-label">STEP 1 · 단어를 입력하거나 사진/PDF를 선택하세요</p>
           <textarea
             id="prompt-word-input"
             class="import-textarea prompt-word-textarea"
-            placeholder="복습할 단어를 쉼표(,)나 줄바꿈으로 나열하세요&#10;예: skid, exotic, console, repellent&#10;※ PDF나 사진을 첨부해서 물어볼 거면 비워두세요"
+            placeholder="복습할 단어를 쉼표(,)나 줄바꿈으로 나열하세요&#10;예: skid, exotic, console, repellent"
             spellcheck="false"
             rows="3"
           ></textarea>
@@ -222,43 +208,24 @@
               <span class="ai-file-name" id="ai-file-name">선택된 파일 없음</span>
             </div>
             <input type="file" id="ai-file-input" accept="image/jpeg,image/png,image/webp,application/pdf" hidden />
-            <button class="btn-ai-generate" id="btn-ai-generate">🤖 AI로 바로 생성</button>
             <input class="form-input beta-input" id="beta-code" placeholder="베타 코드 (테스터용 암호)" autocomplete="off" />
+            <button class="btn-ai-generate" id="btn-ai-generate">🤖 AI로 바로 생성</button>
           </div>
-          <details class="guide-detail manual-detail">
-            <summary>수동으로 하기 (프롬프트 복사)</summary>
-            <button class="btn-copy-prompt" id="btn-copy-prompt">📋 AI 프롬프트 복사</button>
-            <p class="step-hint">복사한 프롬프트를 GPT나 제미나이에 붙여넣고, 답변을 통째로 복사해서 아래에 붙여넣으세요.<br>단어 칸을 비워두고 복사하면 PDF·사진 첨부용 프롬프트가 만들어져요.</p>
-          </details>
+          <p class="step-hint">단어만 나열하거나, 교재 사진·PDF만 올리거나, 둘 다 해도 돼요. AI가 뜻과 예문까지 만들어줘요.</p>
         </div>
 
-        <div class="import-guide">
-          <p class="guide-text">STEP 2 · GPT/제미나이 답변(또는 구글시트 내용)을 그대로 붙여넣으세요.</p>
-          <details class="guide-detail">
-            <summary>지원하는 형식 보기</summary>
-            <div class="guide-formats">
-              <div class="guide-format">
-                <b>① 마크다운 표 (GPT/제미나이 기본 응답)</b>
-                <code>| Word | Definition (KR) | Definition | Example Sentence |<br>|---|---|---|---|<br>| brave | 용감한 | ... | The brave hero won. |</code>
-              </div>
-              <div class="guide-format">
-                <b>② 구글시트 형식 (탭 구분)</b>
-                <code>Word  Definition  Example Sentence<br>brave  용감한  The brave hero won.</code>
-              </div>
-              <div class="guide-format">
-                <b>③ 간단 형식 (탭 구분, 4열)</b>
-                <code>단어  한글뜻  영영뜻  예문</code>
-              </div>
-            </div>
-          </details>
-        </div>
+        <details class="guide-detail paste-detail">
+          <summary>📋 표 붙여넣기로 추가 (구글시트 등)</summary>
+          <textarea
+            id="import-textarea"
+            class="import-textarea"
+            placeholder="구글시트나 표(마크다운)를 복사해서 붙여넣으세요 (Ctrl+V)…&#10;컬럼: 단어 / 한글뜻 / 영영뜻 / 예문"
+            spellcheck="false"
+          ></textarea>
+          <button class="btn-parse-paste" id="btn-import-parse">미리보기</button>
+        </details>
 
-        <textarea
-          id="import-textarea"
-          class="import-textarea"
-          placeholder="여기에 GPT/제미나이 답변이나 구글시트 내용을 붙여넣으세요 (Ctrl+V)…"
-          spellcheck="false"
-        ></textarea>
+        <button class="btn-manual-one" id="btn-manual-one">✍️ 한 단어씩 직접 입력하기</button>
 
         <div id="import-preview" class="import-preview hidden">
           <p class="preview-title" id="preview-title"></p>
@@ -269,7 +236,6 @@
 
         <div class="modal-buttons">
           <button class="btn-secondary" id="btn-import-cancel">취소</button>
-          <button class="btn-outline-primary" id="btn-import-parse">미리보기</button>
           <button class="btn-primary hidden" id="btn-import-add">추가하기</button>
           <button class="btn-primary-red hidden" id="btn-import-replace">전체 교체</button>
         </div>

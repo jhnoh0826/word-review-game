@@ -723,19 +723,6 @@ body {
   color: #a89fff; margin-bottom: 10px;
 }
 .prompt-word-textarea { height: auto; min-height: 64px; margin-bottom: 10px; }
-.btn-copy-prompt {
-  width: 100%; margin-bottom: 0;
-  background: transparent;
-  border: 2px solid var(--primary); color: #a89fff;
-  font-family: inherit; font-size: 15px; font-weight: 800;
-  padding: 12px; border-radius: 14px; cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-.btn-copy-prompt:hover { background: rgba(108,99,255,0.15); }
-.btn-copy-prompt.copied {
-  border-color: var(--correct); color: var(--correct);
-  background: rgba(46,204,113,0.15);
-}
 .step-hint {
   font-size: 12.5px; color: rgba(255,255,255,0.45);
   font-weight: 600; margin-top: 10px; line-height: 1.5;
@@ -774,9 +761,30 @@ body {
 .beta-input {
   font-size: 13px !important; padding: 9px 12px !important;
 }
-.manual-detail { margin-top: 12px; }
-.manual-detail summary { font-size: 12.5px; }
-.manual-detail .btn-copy-prompt { margin-top: 10px; }
+/* 표 붙여넣기 접이식 영역 */
+.paste-detail { margin-bottom: 12px; }
+.paste-detail summary { font-size: 13px; }
+.paste-detail .import-textarea { margin-top: 10px; margin-bottom: 8px; height: 120px; }
+.btn-parse-paste {
+  width: 100%;
+  background: transparent;
+  border: 2px solid var(--primary); color: #a89fff;
+  font-family: inherit; font-size: 14px; font-weight: 800;
+  padding: 10px; border-radius: 12px; cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-parse-paste:hover { background: rgba(108,99,255,0.15); }
+
+.btn-manual-one {
+  width: 100%; margin-bottom: 12px;
+  background: transparent;
+  border: 1.5px dashed rgba(255,255,255,0.25);
+  color: rgba(255,255,255,0.5); font-family: inherit;
+  font-size: 13.5px; font-weight: 700;
+  padding: 10px; border-radius: 12px; cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.btn-manual-one:hover { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.8); }
 
 .import-guide { margin-bottom: 14px; }
 .guide-text { font-size: 15px; color: rgba(255,255,255,0.65); font-weight: 600; margin-bottom: 8px; }
